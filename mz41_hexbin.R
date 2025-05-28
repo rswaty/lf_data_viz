@@ -11,6 +11,8 @@
 # load packages
 library(exactextractr)
 library(foreign)
+library(htmltools)
+library(htmlwidgets)
 library(leaflet)
 library(rlandfire)
 library(sf)
@@ -204,7 +206,7 @@ hexs_bps_4326 <- st_transform(hexs_bps, crs = 4326)
 
 
 
-leaflet(hexs_bps_4326) %>%
+map <- leaflet(hexs_bps_4326) %>%
   addProviderTiles("CartoDB.Positron") %>%
   setView(lng = -93, lat = 47, zoom = 7) %>%
   addPolygons(
@@ -224,8 +226,44 @@ leaflet(hexs_bps_4326) %>%
       style = list("font-weight" = "normal", padding = "3px 8px"),
       textsize = "15px",
       direction = "auto"
-    )
-  ) %>%
-  addScaleBar(position = "bottomleft", options = scaleBarOptions(metric = TRUE, imperial = FALSE))
+    )) %>%
+  addScaleBar(position = "bottomleft", options = scaleBarOptions(metric = TRUE, imperial = FALSE)) %>%
 
+  addControl("<h3>Top LANDFIRE Biophysical Settings (historical ecosystems) per hexagon for Map Zone 41 <br> 
+             Hexagons are ~200km, more information on BpSs at <a href='https://landfire.gov/vegetation/bps' target='_blank'>https://landfire.gov/vegetation/bps</a></h3>", 
+             position = "topright", className = "map-title") %>%
+  addControl(tags$style(HTML("
+  .map-title {
+    background-color: white;
+    border: 2px solid #666;
+    padding: 25px;
+    border-radius: 5px;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: right; /* Center the title */
+  }
+")), position = "topright")
+
+
+
+map
+
+
+# Save the map as a self-contained HTML file
+saveWidget(map, "bps_map.html", selfcontained = TRUE)
+
+# Calculate annual acres burned for top 10 BpSs
+
+
+annualFire <- bps_aoi_atts%>%
+  mutate(annual_fire_acres = ((1/FRI_ALLFIR)*ACRES)) %>%
+  filter(BPS_NAME != 'Open Water') %>%
+  group_by(BPS_NAME) %>%
+  summarize(acres = sum(annual_fire_acres)) %>%
+  arrange(desc(acres)) %>%
+  top_n(n = 10, wt = acres)
+
+print(sum(annualFire$acres))
+
+1,956,152
 
